@@ -1,0 +1,192 @@
+Lifecycle-Meta-Argument
+
+
+
+########- lifecycle(Meta-Arguments):- #########
+-lifecycle is a nested block that can appear within a resource block. 
+-lifecyle Meta-Argument block contains 3 arguments:-		
+	-create_before_destroy
+	-prevent_destroy
+	-ignore_changes
+
+
+
+
+####-create_before_destroy:-	
+	-Once you set this argument then the resource will be created once again, and after that
+	old resource will get destroyed, when you run terraform detsroy,
+
+
+
+# Create EC2 Instance
+resource "aws_instance" "web_instance" {
+  ami               = "ami-0aa7d40eeae50c9a9"
+  instance_type     = "t2.micro"
+  availability_zone = "us-east-1a"
+  #availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_server"
+  } 
+}
+
+
+
+######### CLI ######################
+terraform init
+terraform plan
+terraform apply
+
+
+
+- updade in availability_zone from us-east-1a to us-east-1b & then do terraform plan & observe
+terraform plan
+	-here you get: Plan: 1 to add, 0 to change, 1 to destroy.
+terraform apply -auto-approve
+	-here 1st destroy old infra and then create new infra as per your terraform script
+
+
+
+
+- enable this in same script 'create_before_destroy = true' & do terraform plan , see:
+# Create EC2 Instance
+resource "aws_instance" "web_instance" {
+  ami               = "ami-0aa7d40eeae50c9a9"
+  instance_type     = "t2.micro"
+  #availability_zone = "us-east-1a"
+  availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_server"
+  }
+
+ lifecycle {
+    create_before_destroy = true
+  }
+
+}
+
+
+##### CLI ############
+terraform plan
+	-get- No changes. Your infrastructure matches the configuration.
+	
+	-next updade in availability_zone from us-east-1b to us-east-1a & then do terraform plan & observe
+terraform plan
+terraform apply -auto-approve
+	--here 1st create new infra as per changes in terraform script & then it will destroy old infra which you creatd before,
+
+
+##====================================================================##
+
+
+
+
+
+
+####-prevent_destroy
+	-It prevents from destroying your terraform resource, once you set this terraform argument then 
+	the resource can not be destroyed,
+  
+
+# Create EC2 Instance
+resource "aws_instance" "web_instance" {
+  ami               = "ami-0aa7d40eeae50c9a9"
+  instance_type     = "t2.micro"
+  availability_zone = "us-east-1a"
+  #availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_server"
+  }
+
+ lifecycle {
+    prevent_destroy  = true     # Default is false
+  }
+
+}
+
+
+
+
+
+############ CLI ################
+terraform plan
+terraform apply
+	-no changes
+terraform destroy
+	-get error bcuz of 'prevent_destroy' is enable, if you want to destroy your resource then you have to enable
+	 'prevent_destroy  = false' then you will be able to destroy
+
+-enable this 'prevent_destroy  = false' & do terraform destroy
+terraform destroy -auto-approve
+	-infra will be destroyed
+
+
+##====================================================================##
+
+
+
+
+
+
+
+#######-ignore_changes
+	-whatever attributes/parameters we mention in [ignore_changes] option, that attributes/parameters 
+	is going to be ignored.	
+  
+
+# Create EC2 Instance
+resource "aws_instance" "web_instance" {
+  ami               = "ami-0aa7d40eeae50c9a9"
+  instance_type     = "t2.micro"
+  availability_zone = "us-east-1a"
+  #availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_server"
+  }
+}
+
+
+
+
+############# CLI ####################
+terraform plan
+terraform apply -auto-approve
+
+
+
+-next Update the tag manually by going to AWS management console, like:
+	-add tag
+	owner = hamid
+
+-do cli
+terraform plan
+	-say 1 to change
+
+
+-add the 'ignore_changes' & enable and do terraform plan:
+
+# Create EC2 Instance
+resource "aws_instance" "web_instance" {
+  ami               = "ami-0aa7d40eeae50c9a9"
+  instance_type     = "t2.micro"
+  availability_zone = "us-east-1a"
+  #availability_zone = "us-east-1b"
+  tags = {
+    Name = "web_server"
+  }
+  lifecycle {
+    ignore_changes = [
+      tags,
+    ]
+  }
+}
+
+
+
+########### CLI ############## 
+terraform plan
+terraform apply
+	-get no chages match infra,
+terraform destroy -auto-approve
+
+##==================================================##	
+

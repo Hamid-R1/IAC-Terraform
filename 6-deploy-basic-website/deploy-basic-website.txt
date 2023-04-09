@@ -1,0 +1,183 @@
+deploy-basic-website
+
+
+# deploy a basic html-CSS-JS based website into Apache_Web_Server on AWS-infra
+
+# github repo:-
+	- https://github.com/Hamid-R1/basic_profile_website.git
+	 
+		
+# here we create aws services which are required for deploy this 'html-CSS-JS' based website
+	-vpc
+	-subnet
+	-internet gateway
+	-route table(subnet_association & add internet_gatewat to this route_table)
+	-security group (allow port 22 for ssh & 80 for website which will be publicly available )
+	-ec2-instance 
+		-add shell-scripts to user_data
+
+
+# here in this basic_website, we have only wb_server_layer, and 2 things/layers are missing here:-
+	-1st- Application(app_layer_server)
+	-2nd- Database(db_layer_server)
+
+
+
+############################ terraform scripts ###################################################
+
+##########################
+# 1-provider.tf
+##########################
+# Provider Block
+provider "aws" {
+  region  = "us-east-1"   		# N.Virginia #
+  profile = "cloud-admin" 		# iam-user #
+}
+
+
+
+############################
+# 2-vpc.tf
+############################
+resource "aws_vpc" "web_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    "Name" = "hr_vpc"
+  }
+}
+
+# subnet
+resource "aws_subnet" "web_subnet" {
+  vpc_id           = aws_vpc.web_vpc.id
+  cidr_block       = "10.0.0.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "hr_subnet"
+  }
+}
+
+# igw
+resource "aws_internet_gateway" "web_igw" {
+  vpc_id = aws_vpc.web_vpc.id
+  tags = {
+    "Name" = "hr_igw"
+  }
+}
+
+# route_table
+resource "aws_route_table" "wb_rt" {
+  vpc_id = aws_vpc.web_vpc.id
+  tags = {
+    "Name" = "hr_rt"
+  }
+}
+
+# igw attach to route_table
+resource "aws_route" "web_igw_attach" {
+  route_table_id         = aws_route_table.wb_rt.id
+  gateway_id             = aws_internet_gateway.web_igw.id
+  destination_cidr_block = "0.0.0.0/0"
+}
+
+# subnet association
+resource "aws_route_table_association" "web_subnet_associatiom" {
+  route_table_id = aws_route_table.wb_rt.id
+  subnet_id      = aws_subnet.web_subnet.id
+}
+
+
+
+###################################
+# 3-sg.tf
+###################################
+# Create Security Group
+resource "aws_security_group" "web_sg" {
+  name        = "hr_sg"
+  description = "allow port 22-80"
+  vpc_id      = aws_vpc.web_vpc.id
+  tags = {
+    "Name" = "hr_sg_web_server"
+  }
+  ingress {
+    description = "allow port 22 from owner ip"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    #cidr_blocks = ["103.71.20.6/32"]		#from owner ip
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    description = "allow port 80 for all"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "allow all ports"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+
+
+###########################################
+# 4-ec2-instance.tf
+###########################################
+resource "aws_instance" "web_instance" {
+  ami                         = "ami-0aa7d40eeae50c9a9"
+  instance_type               = "t2.micro"
+  key_name                    = "hr-web-n-virginia"
+  subnet_id                   = aws_subnet.web_subnet.id
+  associate_public_ip_address = "true"
+  user_data                   = file("5-deploy_website.sh")
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  tags = {
+    "Name" = "hr_server"
+  }
+}
+
+
+
+##########################################
+# 5-deploy_website.sh
+##########################################
+#!/bin/bash
+
+# System Updates
+sudo su -
+yum -y update
+
+# Install Apache Web Server
+yum install -y httpd
+
+# Start & enable Apache Web Server
+systemctl start httpd
+systemctl enable httpd
+
+# Install git & clone 'html-css-js-code' from github
+yum install -y git
+mkdir source-code
+cd source-code
+git clone https://github.com/Hamid-R1/basic_profile_website.git
+
+# Configure & setup 'Application' to this path '/var/www/html/'
+cd basic_profile_website/DevFolio/
+cp -r * /var/www/html/
+
+
+
+
+################## Terraform CLI Commands ############################
+terraform init
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+terraform destroy
+
+
+======================================================================================
